@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Smart Car</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            overflow: hidden;
+        }
+
+        canvas {
+            height: 100vh;
+            width: 100vw;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas></canvas>
+    <script src="cannon.js"></script>
+    <script src="three.js"></script>
+    <script src="TrackballControls.js"></script>
+    <script src="CannonDebugRenderer.js"></script>
+    <script>
+        const canvas = document.getElementsByTagName("canvas")[0]
+        const WIDTH = parseInt(canvas.getBoundingClientRect().width)
+        const HEIGHT = parseInt(canvas.getBoundingClientRect().height)
+
+        const global = {
+            THREE: {},
+            CANNON: {},
+            MeshBodyPairs: []
+        }
+
+        //threejs things: renderer, scene, camera, ambientLight
+        global.THREE.renderer = new THREE.WebGLRenderer({
+            antialias: true,
+            canvas: canvas
+        })
+        global.THREE.renderer.setPixelRatio(window.devicePixelRatio)
+        global.THREE.renderer.setSize(WIDTH, HEIGHT)
+
+        global.THREE.scene = new THREE.Scene()
+        global.THREE.scene.background = new THREE.Color("#000000")
+
+        global.THREE.camera = new THREE.PerspectiveCamera(45, WIDTH / HEIGHT, 1, 1000)
+        global.THREE.camera.position.set(0, 10, 10)
+        global.THREE.scene.add(global.THREE.camera)
+
+        global.THREE.ambientLight = new THREE.AmbientLight(0xffffff, 1)
+        global.THREE.scene.add(global.THREE.ambientLight)
+
+
+        //cannonjs things:
+        global.CANNON.world = new CANNON.World()
+        global.CANNON.world.gravity.set(0, -10, 0)
+
+        var cannonDebugRenderer = new THREE.CannonDebugRenderer(global.THREE.scene, global.CANNON.world)
+
+        //support things
+        var groundThree = new THREE.Mesh(
+            new THREE.BoxBufferGeometry(200, 200, 2),
+            new THREE.MeshPhongMaterial({
+                color: "#FF0000",
+                side: THREE.DoubleSide
+            })
+        )
+        global.THREE.scene.add(groundThree)
+
+        var ground = new CANNON.Body({
+            shape: new CANNON.Box(new CANNON.Vec3(100, 100, 1)),
+            mass: 0
+        })
+
+        ground.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2)
+        global.CANNON.world.addBody(ground)
+
+
+        global.MeshBodyPairs.push({
+            body: ground,
+            mesh: groundThree
+        })
+
+        //controls related
+        var controls = new THREE.TrackballControls(global.THREE.camera, canvas);
+        controls.rotateSpeed = 1.0;
+        controls.zoomSpeed = 1.2;
+        controls.panSpeed = 0.2;
+        controls.noZoom = false;
+        controls.noPan = false;
+        controls.staticMoving = false;
+        controls.dynamicDampingFactor = 0.3;
+        var radius = 100;
+        controls.minDistance = 0.0;
+        controls.maxDistance = radius * 1000;
+        //controls.keys = [ 65, 83, 68 ]; // [ rotateKey, zoomKey, panKey ]
+        controls.screen.width = WIDTH;
+        controls.screen.height = HEIGHT;
+
+        //vehicle handling
+
+        var options = {
+            radius: 0.7,
+            directionLocal: new CANNON.Vec3(0, 0, -1),
+            suspensionStiffness: 30,
+            suspensionRestLength: 0.3,
+            frictionSlip: 5,
+            dampingRelaxation: 2.3,
+            dampingCompression: 4.4,
+            maxSuspensionForce: 100000,
+            rollInfluence: 0.01,
+            axleLocal: new CANNON.Vec3(0, 1, 0),
+            chassisConnectionPointLocal: new CANNON.Vec3(1, 1, 0),
+            maxSuspensionTravel: 0.3,
+            customSlidingRotationalSpeed: -30,
+            useCustomSlidingRotationalSpeed: true
+        }
+
+        var chassisShape = new CANNON.Box(new CANNON.Vec3(2, 1, 0.5))
+        var chassisBody = new CANNON.Body({
+            shape: chassisShape,
+            mass: 150
+        })
+        chassisBody.quaternion.set(-1, 0, 0, 1)
+        chassisBody.position.set(0, 2, -4)
+
+        var chassisMesh = new THREE.Mesh(new THREE.BoxBufferGeometry(4, 2, 1), new THREE.MeshPhongMaterial({
+            color: 0x00FFFF,
+            transparent: true,
+            opacity: 0.5
+        }))
+        global.THREE.scene.add(chassisMesh)
+        global.MeshBodyPairs.push({
+            mesh: chassisMesh,
+            body: chassisBody
+        })
+
+        vehicle = new CANNON.RaycastVehicle({
+            chassisBody: chassisBody
+        })
+
+        options.chassisConnectionPointLocal.set(1, 1, 0)
+        vehicle.addWheel(options)
+
+        options.chassisConnectionPointLocal.set(1, -1, 0)
+        vehicle.addWheel(options)
+
+        options.chassisConnectionPointLocal.set(-1, 1, 0)
+        vehicle.addWheel(options)
+
+        options.chassisConnectionPointLocal.set(-1, -1, 0)
+        vehicle.addWheel(options)
+
+        vehicle.addToWorld(global.CANNON.world)
+
+        var wheelBodies = [];
+        for (var i = 0; i < vehicle.wheelInfos.length; i++) {
+            var wheel = vehicle.wheelInfos[i];
+            var cylinderShape = new CANNON.Cylinder(wheel.radius, wheel.radius, wheel.radius / 2, 20);
+            var wheelBody = new CANNON.Body({
+                mass: 0
+            });
+            wheelBody.type = CANNON.Body.KINEMATIC;
+            wheelBody.collisionFilterGroup = 0; // turn off collisions 
+            var q = new CANNON.Quaternion();
+            q.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), Math.PI / 2);
+            wheelBody.addShape(cylinderShape, new CANNON.Vec3(), q);
+            wheelBodies.push(wheelBody);
+            global.CANNON.world.addBody(wheelBody);
+
+            var wheelMesh = new THREE.Mesh(
+                new THREE.CylinderBufferGeometry(wheel.radius, wheel.radius, wheel.radius / 2, 20),
+                new THREE.MeshPhongMaterial({
+                    color: 0xFFFF00
+                })
+            )
+
+            global.MeshBodyPairs.push({
+                mesh: wheelMesh,
+                body: wheelBody
+            })
+            global.THREE.scene.add(wheelMesh)
+        }
+
+        // Update wheels 
+        global.CANNON.world.addEventListener('postStep', function () {
+            for (var i = 0; i < vehicle.wheelInfos.length; i++) {
+                vehicle.updateWheelTransform(i);
+                var t = vehicle.wheelInfos[i].worldTransform;
+                var wheelBody = wheelBodies[i];
+                wheelBody.position.copy(t.position);
+                wheelBody.quaternion.copy(t.quaternion);
+            }
+        });
+
+
+        draw()
+
+        function draw() {
+            controls.update()
+            requestAnimationFrame(draw)
+
+            for (var pair of global.MeshBodyPairs) {
+                pair.mesh.position.set(
+                    pair.body.position.x,
+                    pair.body.position.y,
+                    pair.body.position.z
+                )
+                pair.mesh.quaternion.set(
+                    pair.body.quaternion.x,
+                    pair.body.quaternion.y,
+                    pair.body.quaternion.z,
+                    pair.body.quaternion.w
+                )
+            }
+
+            cannonDebugRenderer.update()
+            global.THREE.renderer.render(global.THREE.scene, global.THREE.camera)
+            global.CANNON.world.step(1 / 60)
+        }
+
+        function to_radians(degrees) {
+            return degrees * (Math.PI / 180)
+        }
+
+
+        document.onkeydown = handler;
+        document.onkeyup = handler;
+
+        var maxSteerVal = 0.5;
+        var maxForce = 1000;
+        var brakeForce = 1000000;
+
+        function handler(event) {
+            var up = (event.type == 'keyup');
+
+            if (!up && event.type !== 'keydown') {
+                return;
+            }
+
+            vehicle.setBrake(0, 0);
+            vehicle.setBrake(0, 1);
+            vehicle.setBrake(0, 2);
+            vehicle.setBrake(0, 3);
+
+            switch (event.keyCode) {
+
+                case 38: // forward
+                    vehicle.applyEngineForce(up ? 0 : -maxForce, 2);
+                    vehicle.applyEngineForce(up ? 0 : -maxForce, 3);
+                    break;
+
+                case 40: // backward
+                    vehicle.applyEngineForce(up ? 0 : maxForce, 2);
+                    vehicle.applyEngineForce(up ? 0 : maxForce, 3);
+                    break;
+
+                case 66: // b
+                    vehicle.setBrake(brakeForce, 0);
+                    vehicle.setBrake(brakeForce, 1);
+                    vehicle.setBrake(brakeForce, 2);
+                    vehicle.setBrake(brakeForce, 3);
+                    break;
+
+                case 39: // right
+                    vehicle.setSteeringValue(up ? 0 : -maxSteerVal, 0);
+                    vehicle.setSteeringValue(up ? 0 : -maxSteerVal, 1);
+                    break;
+
+                case 37: // left
+                    vehicle.setSteeringValue(up ? 0 : maxSteerVal, 0);
+                    vehicle.setSteeringValue(up ? 0 : maxSteerVal, 1);
+                    break;
+
+            }
+        }
+    </script>
+</body>
+
+</html>

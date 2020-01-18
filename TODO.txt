@@ -1,0 +1,8 @@
+reset position and quaternion of all cars to be reInit
+
+make sensors percieve distance
+
+when initiate is clicked, startAnimation should be called, resetCars, reInitCarDatastructures, generate should be called
+when clicking on stop button, only rendering is to be done and no physics calculations should be done and also no predictions
+
+generate should call startPhysics

@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Smart Car</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            overflow: hidden;
+        }
+
+        body {
+            overflow: hidden;
+        }
+
+        canvas {
+            height: 100vh;
+            width: 100vw;
+        }
+
+        #action_buttons {
+            display: flex;
+            height: 7%;
+            width: 99%;
+            padding-left: 0.5%;
+            padding-right: 0.5%;
+            position: absolute;
+            bottom: 0;
+
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        button {
+            outline: none;
+            font-family: arial;
+            padding: 2px;
+            font-weight: bold;
+        }
+
+        input[type="number"] {
+            padding: 2px;
+            outline: none;
+        }
+
+        #stats_overlay{
+            position: absolute;
+            right: 0;
+            top: 0;
+            color: white;
+            font-size: 2em;
+            padding: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas></canvas>
+
+    <div id="stats_overlay">
+        1
+    </div>
+
+    <div id="action_buttons">
+        <div>
+            <button id="generate_btn">generate</button>
+            <button id="stop_btn">stop</button>
+            <button id="start_prediction_btn">start prediction</button>
+        </div>
+
+        <div>
+            <input type="number" id="car_id" min="0" />
+            <button id="highlight_btn">highlight</button>
+            <button id="add_to_pool_btn">add/remove from pool</button>
+        </div>
+
+        <div>
+            <button id="stats_btn">stats</button>
+        </div>
+
+    </div>
+
+    <script>
+        var car_id_dom = document.getElementById("car_id")
+        var highlight_btn = document.getElementById("highlight_btn")
+        var add_to_pool_btn = document.getElementById("add_to_pool_btn")
+        var generate_btn = document.getElementById("generate_btn")
+        var stop_btn = document.getElementById("stop_btn")
+        var start_prediction = document.getElementById("start_prediction_btn")
+
+        car_id_dom.addEventListener("change", function () {
+            car_id_dom.style.border = "2px solid white"
+        })
+
+        add_to_pool_btn.addEventListener("click", function () {
+            var car_id = parseInt(car_id_dom.value)
+
+            if (car_id >= MAX_POPULATION || car_id < 0 || isNaN(car_id)) {
+                car_id_dom.style.border = "2px solid red"
+                return
+            }
+
+            var index = mating_pool.indexOf(car_id)
+
+            if (index == -1) {
+                mating_pool.push(car_id)
+            } else {
+                mating_pool.splice(index, 1)
+            }
+
+            refreshMatingPoolList()
+        })
+
+        highlight_btn.addEventListener("click", function () {
+            var car_id = parseInt(car_id_dom.value)
+
+            if (car_id >= MAX_POPULATION || car_id < 0 || isNaN(car_id)) {
+                car_id_dom.style.border = "2px solid red"
+            } else {
+                highlightVehicle(car_id)
+
+                setTimeout(function () {
+                    removeHighlightFromVehicle(car_id)
+                }, 1000)
+            }
+        })
+
+        function refreshMatingPoolList() {
+            // stats panel ke andar kidhar to daalna hai ye
+        }
+
+        stop_btn.addEventListener("click", function () {
+            stopPhysics()
+            stop_btn.disabled = true
+            generate_btn.disabled = false
+
+            start_prediction = false
+
+            for (var car of generation) {
+                if (car.body)
+                    car.dead()
+            }
+        })
+
+        generate_btn.addEventListener("click", function () {
+            stop_btn.disabled = false
+            generate_btn.disabled = true
+
+            car_id_dom.value = 0
+            removeHighlightFromVehicle(highlighted_car)
+            highlighted_car = 0
+                
+            resetCars()
+            generate()
+            startPhysics()
+            stats_overlay.innerText = THIS_GENERATION
+        })
+
+        start_prediction_btn.addEventListener("click", function(){
+            start_prediction = true
+        })
+    </script>
+
+    <script>
+        //globals
+        const canvas = document.getElementsByTagName("canvas")[0]
+        const WIDTH = parseInt(canvas.getBoundingClientRect().width)
+        const HEIGHT = parseInt(canvas.getBoundingClientRect().height)
+
+        const global = {
+            THREE: {},
+            CANNON: {},
+            MeshBodyPairs: [],
+        }
+
+        function to_radians(degrees) {
+            return degrees * (Math.PI / 180)
+        }
+        function to_degrees(radians){
+            return radians*180/Math.PI
+        }        
+
+        function getRandomArbitrary(min, max) {
+            return Math.random() * (max - min) + min;
+        }
+
+        function getRandomInt(min, max) {
+            min = Math.ceil(min);
+            max = Math.floor(max);
+            return Math.floor(Math.random() * (max - min)) +
+            min; //The maximum is exclusive and the minimum is inclusive
+        }
+
+        var previous
+        var RandomGaussian = function (mean, sd) {
+            var y1, x1, x2, w;
+            if (previous) {
+                y1 = y2;
+                previous = false;
+            } else {
+                do {
+                    x1 = getRandomArbitrary(0, 2) - 1;
+                    x2 = getRandomArbitrary(0, 2) - 1;
+                    w = x1 * x1 + x2 * x2;
+                } while (w >= 1);
+                w = Math.sqrt((-2 * Math.log(w)) / w);
+                y1 = x1 * w;
+                y2 = x2 * w;
+                previous = true;
+            }
+
+            var m = mean || 0;
+            var s = sd || 1;
+            return y1 * s + m;
+        }
+
+        // obj - your object (THREE.Object3D or derived)
+        // point - the point of rotation (THREE.Vector3)
+        // axis - the axis of rotation (normalized THREE.Vector3)
+        // theta - radian value of rotation
+        // pointIsWorld - boolean indicating the point is in world coordinates (default = false)
+        function rotateAboutPoint(obj, point, axis, theta, pointIsWorld) {
+            pointIsWorld = (pointIsWorld === undefined) ? false : pointIsWorld;
+
+            if (pointIsWorld) {
+                obj.parent.localToWorld(obj.position); // compensate for world coordinate
+            }
+
+            obj.position.sub(point); // remove the offset
+            obj.position.applyAxisAngle(axis, theta); // rotate the POSITION
+            obj.position.add(point); // re-add the offset
+
+            if (pointIsWorld) {
+                obj.parent.worldToLocal(obj.position); // undo world coordinates compensation
+            }
+
+            obj.rotateOnAxis(axis, theta); // rotate the OBJECT
+        }
+
+
+        function onLine(l1, p) { //check whether p is on the line or not
+            if (p.x <= Math.max(l1.p1.x, l1.p2.x) && p.x <= Math.min(l1.p1.x, l1.p2.x) &&
+                (p.z <= Math.max(l1.p1.z, l1.p2.z) && p.z <= Math.min(l1.p1.z, l1.p2.z)))
+                return true;
+
+            return false;
+        }
+
+        function direction(a, b, c) {
+            var val = (b.z - a.z) * (c.x - b.x) - (b.x - a.x) * (c.z - b.z);
+            if (val == 0)
+                return 0; //colinear
+            else if (val < 0)
+                return 2; //anti-clockwise direction
+
+            return 1; //clockwise direction
+        }
+
+        function isIntersect(l1, l2) {
+            //four direction for two lines and points of other line
+            var dir1 = direction(l1.p1, l1.p2, l2.p1);
+            var dir2 = direction(l1.p1, l1.p2, l2.p2);
+            var dir3 = direction(l2.p1, l2.p2, l1.p1);
+            var dir4 = direction(l2.p1, l2.p2, l1.p2);
+
+            if (dir1 != dir2 && dir3 != dir4)
+                return true; //they are intersecting
+
+            if (dir1 == 0 && onLine(l1, l2.p1)) //when p2 of line2 are on the line1
+                return true;
+
+            if (dir2 == 0 && onLine(l1, l2.p2)) //when p1 of line2 are on the line1
+                return true;
+
+            if (dir3 == 0 && onLine(l2, l1.p1)) //when p2 of line1 are on the line2
+                return true;
+
+            if (dir4 == 0 && onLine(l2, l1.p2)) //when p1 of line1 are on the line2
+                return true;
+
+            return false;
+        }
+
+        function lineLineIntersection(l1, l2) {
+            if(isIntersect(l1, l2)){
+                var A = l1.p1
+                var B = l1.p2
+                var C = l2.p1
+                var D = l2.p2
+    
+                // Line AB represented as a1x + b1y = c1
+                var a1 = B.z - A.z;
+                var b1 = A.x - B.x;
+                var c1 = a1 * (A.x) + b1 * (A.z);
+    
+                // Line CD represented as a2x + b2y = c2
+                var a2 = D.z - C.z;
+                var b2 = C.x - D.x;
+                var c2 = a2 * (C.x) + b2 * (C.z);
+    
+                var determinant = a1 * b2 - a2 * b1;
+    
+                var x = (b2 * c1 - b1 * c2) / determinant;
+                var y = (a1 * c2 - a2 * c1) / determinant;
+                return {x: x, z: y};
+            }else{
+                return null
+            }
+        }
+
+        //collision filters
+        var GROUP1 = 1;
+        var GROUP2 = 2;
+        var GROUP3 = 4;
+
+        var spawnPoint = {
+            x: 0,
+            y: 4,
+            z: 0
+        }
+
+        var spawnQuat = {
+            x: -0.7071067811865476,
+            y: 0,
+            z: 0,
+            w: 0.7071067811865476
+        }
+    </script>
+    <!-- <script src="CannonDebugRenderer.js"></script> -->
+    <script src="cannon.js"></script>
+    <script src="three.js"></script>
+    <script src="TrackballControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.0.0/dist/tf.min.js"></script>
+
+    <script src="cannonInit.js"></script>
+    <script src="threeInit.js"></script>
+    <script src="map.js"></script>
+    <script src="areaSetup.js"></script>
+    <script src="car.js"></script>
+    <script src="ga.js"></script>
+    <script src="neuralNetwork.js"></script>
+    <script>
+        document.onkeydown = handler;
+        // document.onkeyup = handler;        
+
+        var current = 0
+
+        var m = new Map(spawnPoint, 0, 8)
+
+        m.addCheckpointAtCursor()
+        m.extendRouteTurnRight("E")
+        // m.addCheckpointAtCursor()
+        m.extendRouteStraight(6, "S")
+        // m.addCheckpointAtCursor()
+        m.extendRouteStraight(5, "S")
+        // m.addCheckpointAtCursor()
+        m.extendRouteTurnLeft("S")
+        // m.addCheckpointAtCursor()
+        m.extendRouteTurnLeft("E")
+        // m.addCheckpointAtCursor()
+        m.extendRouteStraight(19, "N")
+        // m.addCheckpointAtCursor()
+        // m.extendRouteStraight(5.6, "N")
+        // m.addCheckpointAtCursor()
+        // m.extendRouteStraight(5.8, "N")
+        // m.addCheckpointAtCursor()
+        m.extendRouteTurnLeft("N")
+        // m.addCheckpointAtCursor()
+        m.extendRouteStraight(8, "W")
+        // m.addCheckpointAtCursor()
+        m.extendRouteStraight(8, "W")
+        // m.addCheckpointAtCursor()
+        m.extendRouteTurnLeft("W")
+        // m.addCheckpointAtCursor()
+        m.extendRouteStraight(8, "S")
+        // m.addCheckpointAtCursor()
+        m.extendRouteTurnLeft("S")
+        // m.addCheckpointAtCursor()
+        m.extendRouteTurnRight("E")
+        // m.addCheckpointAtCursor()
+        m.extendRouteStraight(5, "S")
+        // m.addCheckpointAtCursor()
+        m.extendRouteStraight(6, "S")
+        m.addCheckpointAtCursor()
+
+
+        var animFlag = true
+        var physicsFlag = false
+        var start_prediction = false
+
+        initiate()
+
+        function draw() {
+            if (animFlag) {
+                requestAnimationFrame(draw)
+            }
+            controls.update()
+
+            if (physicsFlag) {
+                global.CANNON.world.step(1 / 60)
+
+                resolveMeshBodyPairs()
+                for (var i = 0; i < population.length; i++) {
+                    generation[population[i]].tick()
+                }
+            }
+
+            global.THREE.renderer.render(global.THREE.scene, global.THREE.camera)
+
+            if (physicsFlag) {
+                m.checkCollisions(population) //should be called only after vehicle.tick
+                
+                if(start_prediction){
+                    for (var i = 0; i < population.length; i++) {
+                        generation[population[i]].makeMove()
+                    }
+                }
+            }
+        }
+
+        function startAnimation() {
+            animFlag = true
+            draw()
+        }
+
+        function stopAnimation() {
+            animFlag = false
+        }
+
+        function startPhysics() {
+            physicsFlag = true
+        }
+
+        function stopPhysics() {
+            physicsFlag = false
+        }
+
+        function initiate() {
+            reInitCarsInGeneration()
+            resetCars()
+            generate()
+            startPhysics()
+            startAnimation()
+
+            generate_btn.disabled = true
+        }
+
+
+
+        function resolveMeshBodyPairs() {
+            for (var pair of global.MeshBodyPairs) {
+                if (pair.offset != undefined && pair.offset.position !== undefined) {
+                    pair.mesh.position.set(
+                        pair.body.position.x - pair.offset.position.x,
+                        pair.body.position.y - pair.offset.position.y,
+                        pair.body.position.z - pair.offset.position.z
+                    )
+                } else {
+                    pair.mesh.position.set(
+                        pair.body.position.x,
+                        pair.body.position.y,
+                        pair.body.position.z
+                    )
+                }
+
+                if (pair.copyRotation === true || pair.copyRotation == undefined) {
+                    if (pair.offset != undefined && pair.offset.rotation !== undefined) {
+                        var targetEulerAngles = new THREE.Euler()
+                        targetEulerAngles.setFromQuaternion(pair.body.quaternion)
+                        targetEulerAngles.x -= pair.offset.rotation.x
+                        targetEulerAngles.y -= pair.offset.rotation.y
+                        targetEulerAngles.z -= pair.offset.rotation.z
+                        pair.mesh.quaternion.setFromEuler(targetEulerAngles)
+                    } else {
+                        pair.mesh.quaternion.set(
+                            pair.body.quaternion.x,
+                            pair.body.quaternion.y,
+                            pair.body.quaternion.z,
+                            pair.body.quaternion.w
+                        )
+                    }
+                }
+
+            }
+        }
+
+
+
+        function drawSphereAtPoint(point) {
+            var mesh = new THREE.Mesh(new THREE.SphereBufferGeometry(0.1), new THREE.MeshBasicMaterial({
+                color: 0xff0000
+            }))
+
+            global.THREE.scene.add(mesh)
+            mesh.position.set(point.x, point.y, point.z)
+        }
+
+        function highlightVehicle(no) {
+            generation[no].mesh.material.color.setHex(CAR_HIGHLIGHT_COLOR)
+            generation[no].mesh.material.opacity = CAR_HIGHLIGHT_OPACITY
+        }
+
+        function removeHighlightFromVehicle(no) {
+            if(no >= MAX_POPULATION || no < 0) return
+
+            generation[no].mesh.material.color.setHex(CAR_COLOR)
+            generation[no].mesh.material.opacity = CAR_OPACITY
+        }
+    
+    
+        handler({keyCode: 38})
+    </script>
+</body>
+
+</html>
