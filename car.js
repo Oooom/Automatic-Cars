@@ -104,7 +104,6 @@ function CarWithSensors() {
     global.THREE.scene.add(this.mesh)
 
     this._wheelBodies = [];    
-
     this.resetBody = _resetBody
 
     this.tick = function () {
@@ -190,6 +189,13 @@ function CarWithSensors() {
         this.mesh.position.set(this.body.position.x, this.body.position.y, this.body.position.z)
         this.tick()
 
+        this.removeBodyAndVehicle()
+
+        var car_no = CarsBatcher.car_batch.indexOf(this)
+        population.splice(population.indexOf(car_no), 1)
+    }
+
+    this.removeBodyAndVehicle = function(){
         global.CANNON.world.remove(this.body)
         this._vehicle.removeFromWorld(global.CANNON.world)
 
@@ -200,9 +206,6 @@ function CarWithSensors() {
 
         this.body = null
         this._vehicle = null
-
-        var car_no = generation.indexOf(this)
-        population.splice(population.indexOf(car_no), 1)
     }
 
     this.delete = function () {
@@ -237,11 +240,6 @@ function CarWithSensors() {
 
     this.makeMove = function(){
         var ips = [...this.sensors.map((sensor) => { return sensor.state / CAR_SENSOR_SIZE})]
-        // ips.push( this.body.velocity.x )
-        // ips.push( this.body.velocity.y )
-        // ips.push( this.body.velocity.z )
-
-        
 
         var res = this.brain.predict(ips)
 
@@ -251,22 +249,20 @@ function CarWithSensors() {
         if(res[0] > res[1]){
             engine_force = -MAX_FORCE
         }
-        else{ //if(res[0] > 0.33)
+        else{ 
             engine_force = 0
         }
-        // else{
-        //     engine_force = MAX_FORCE
-        // }
 
-        if(res[2] > res[3]){
+        var max_val = Math.max(res[2], res[3], res[4])
+
+        if(max_val == res[2]){
             steer_val = -MAX_STEER_VAL
-        }
-        // else if(res[1] > 0.33){
-        //     steer_val = 0
-        // }
-        else{
+        }if(max_val == res[3]){
+            steer_val = 0
+        }if(max_val == res[4]){
             steer_val = MAX_STEER_VAL
         }
+        
 
         this.applyEngineForce(engine_force)
         this.turn(steer_val)
@@ -437,67 +433,5 @@ function CarSensor(x, y, z) {
 
     this.delete = function () {
         global.THREE.scene.remove(this.mesh)
-    }
-}
-
-var highlighted_car = -1
-
-function handler(event) {
-    if(event.keyCode != 38 && event.keyCode != 40) return
-
-    removeHighlightFromVehicle(highlighted_car)
-    // up
-
-    if(event.keyCode == 38) {
-        highlighted_car = (highlighted_car + 1) % MAX_POPULATION                
-    }
-
-    //down
-
-    if(event.keyCode == 40){        
-
-        highlighted_car = highlighted_car - 1
-        if(highlighted_car == -1){
-            highlighted_car = MAX_POPULATION - 1
-        }
-    }
-
-    highlightVehicle(highlighted_car)
-
-    car_id_dom.value = highlighted_car
-
-    //bas comment hai
-    {
-    // var up = (event.type == 'keyup');
-
-    // if (!up && event.type !== 'keydown') {
-    //     return;
-    // }
-
-    // generation[population[current]].brake(0)
-
-    // switch (event.keyCode) {
-
-    //     case 38: // forward
-    //         generation[population[current]].forward(up)
-    //         break;
-
-    //     case 40: // backward
-    //         generation[population[current]].reverse(up)
-    //         break;
-
-    //     case 66: // b
-    //         generation[population[current]].brake(MAX_FORCE)
-    //         break;
-
-    //     case 39: // right
-    //         generation[population[current]].turnRight(up)
-    //         break;
-
-    //     case 37: // left
-    //         generation[population[current]].turnLeft(up)
-    //         break;
-
-    // }
     }
 }

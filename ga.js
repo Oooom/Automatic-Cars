@@ -1,8 +1,14 @@
-var population = []     //stores alive members of the generation
+var population = []     //stores alive members of the generation, 0 - batchSize
+var _population = []    //stores 0-batchSize numbers so as to copy it to population array when reiniting batch or generation
 var mating_pool = []    //only contains the brains
 var generation = []
 
-var _population = []
+var car_batch = []
+
+var batchSize = 20
+var current_batch = 0
+
+
 
 var THIS_GENERATION = 0
 
@@ -14,51 +20,33 @@ var MUTATION_RATE = 0.1
 function generate(){
     THIS_GENERATION++
 
-    population = _population.slice()
-
     var i = 0
 
     //move all mating_pool elements to front of next generation
     for(; i < mating_pool.length; i++){
-        var car = generation.splice(mating_pool[i], 1)[0]        
-        generation.unshift(car)
+        var brain = generation.splice(mating_pool[i], 1)[0]
+        generation.unshift(brain)
     }
 
     for(; i < MAX_POPULATION; i++){
         if(mating_pool.length == 0){
-            generation[i].brain = new NeuralNetwork(DEFAULT_ARCHITECTURE)
+            generation[i] = new NeuralNetwork(DEFAULT_ARCHITECTURE)
         }else if(mating_pool.length == 1){
-            generation[i].brain = new NeuralNetwork(DEFAULT_ARCHITECTURE, generation[0].brain)
-            generation[i].brain.mutate(mutationFunction)
+            generation[i] = new NeuralNetwork(DEFAULT_ARCHITECTURE, generation[0])
+            generation[i].mutate(mutationFunction)
         }else{
             //since all previous gen best were stored at the front of the generation, find random between 0 and mating_pool length
             var par1 = getRandomInt(0, mating_pool.length)
             var par2 = getRandomInt(0, mating_pool.length)
 
-            generation[i].brain = new NeuralNetwork(DEFAULT_ARCHITECTURE, generation[par1].brain, generation[par2].brain)
-            generation[i].brain.mutate(mutationFunction)
+            generation[i] = new NeuralNetwork(DEFAULT_ARCHITECTURE, generation[par1], generation[par2])
+            generation[i].mutate(mutationFunction)
         }
     }
 
     mating_pool = []
-}
 
-//must be called onstart and when max_population is changed
-function reInitCarsInGeneration(){
-    // all those in the mating pool should shift to top here...
-
-    while(generation.length < MAX_POPULATION){
-        _population.push(generation.length)
-        generation.push(new CarWithSensors())
-    }
-
-    while(generation.length > MAX_POPULATION){
-        generation[generation.length - 1].delete()
-        generation.splice(generation.length - 1, 1)
-
-        _population.splice(_population.length - 1, 1)
-    }
-
+    CarsBatcher.setBatch(0)
 }
 
 // all dead cars are made alive and position/quaternion are set
@@ -113,8 +101,4 @@ function crossover(target, nn1, nn2) {
     } else {
         target.cloneFrom(nn1)
     }
-}
-
-function addToMatingPool(no){
-    mating_pool.push(no)
 }

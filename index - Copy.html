@@ -49,13 +49,14 @@
             outline: none;
         }
 
-        #stats_overlay{
+        #stats_overlay {
             position: absolute;
             right: 0;
             top: 0;
             color: white;
             font-size: 2em;
             padding: 4px;
+            font-family: Arial, Helvetica, sans-serif;
         }
     </style>
 </head>
@@ -64,7 +65,8 @@
     <canvas></canvas>
 
     <div id="stats_overlay">
-        1
+        Gen: <span id = "current_gen">1</span><br>
+        Batch: <span id="current_batch">1</span>/<span id="total_batch">1</span>
     </div>
 
     <div id="action_buttons">
@@ -101,10 +103,12 @@
         add_to_pool_btn.addEventListener("click", function () {
             var car_id = parseInt(car_id_dom.value)
 
-            if (car_id >= MAX_POPULATION || car_id < 0 || isNaN(car_id)) {
+            if (car_id >= CarsBatcher.batchSize || car_id < 0 || isNaN(car_id)) {
                 car_id_dom.style.border = "2px solid red"
                 return
             }
+
+            car_id += (CarsBatcher.batchSize * CarsBatcher.currentBatch)
 
             var index = mating_pool.indexOf(car_id)
 
@@ -120,7 +124,7 @@
         highlight_btn.addEventListener("click", function () {
             var car_id = parseInt(car_id_dom.value)
 
-            if (car_id >= MAX_POPULATION || car_id < 0 || isNaN(car_id)) {
+            if (car_id >= CarsBatcher.batchSize || car_id < 0 || isNaN(car_id)) {
                 car_id_dom.style.border = "2px solid red"
             } else {
                 highlightVehicle(car_id)
@@ -155,14 +159,13 @@
             car_id_dom.value = 0
             removeHighlightFromVehicle(highlighted_car)
             highlighted_car = 0
-                
-            resetCars()
+
             generate()
             startPhysics()
-            stats_overlay.innerText = THIS_GENERATION
+            current_gen.innerText = THIS_GENERATION
         })
 
-        start_prediction_btn.addEventListener("click", function(){
+        start_prediction_btn.addEventListener("click", function () {
             start_prediction = true
         })
     </script>
@@ -182,9 +185,10 @@
         function to_radians(degrees) {
             return degrees * (Math.PI / 180)
         }
-        function to_degrees(radians){
-            return radians*180/Math.PI
-        }        
+
+        function to_degrees(radians) {
+            return radians * 180 / Math.PI
+        }
 
         function getRandomArbitrary(min, max) {
             return Math.random() * (max - min) + min;
@@ -194,7 +198,7 @@
             min = Math.ceil(min);
             max = Math.floor(max);
             return Math.floor(Math.random() * (max - min)) +
-            min; //The maximum is exclusive and the minimum is inclusive
+                min; //The maximum is exclusive and the minimum is inclusive
         }
 
         var previous
@@ -288,28 +292,31 @@
         }
 
         function lineLineIntersection(l1, l2) {
-            if(isIntersect(l1, l2)){
+            if (isIntersect(l1, l2)) {
                 var A = l1.p1
                 var B = l1.p2
                 var C = l2.p1
                 var D = l2.p2
-    
+
                 // Line AB represented as a1x + b1y = c1
                 var a1 = B.z - A.z;
                 var b1 = A.x - B.x;
                 var c1 = a1 * (A.x) + b1 * (A.z);
-    
+
                 // Line CD represented as a2x + b2y = c2
                 var a2 = D.z - C.z;
                 var b2 = C.x - D.x;
                 var c2 = a2 * (C.x) + b2 * (C.z);
-    
+
                 var determinant = a1 * b2 - a2 * b1;
-    
+
                 var x = (b2 * c1 - b1 * c2) / determinant;
                 var y = (a1 * c2 - a2 * c1) / determinant;
-                return {x: x, z: y};
-            }else{
+                return {
+                    x: x,
+                    z: y
+                };
+            } else {
                 return null
             }
         }
@@ -345,6 +352,7 @@
     <script src="car.js"></script>
     <script src="ga.js"></script>
     <script src="neuralNetwork.js"></script>
+    <script src="cars_batcher.js"></script>
     <script>
         document.onkeydown = handler;
         // document.onkeyup = handler;        
@@ -407,7 +415,7 @@
 
                 resolveMeshBodyPairs()
                 for (var i = 0; i < population.length; i++) {
-                    generation[population[i]].tick()
+                    CarsBatcher.car_batch[population[i]].tick()
                 }
             }
 
@@ -415,10 +423,10 @@
 
             if (physicsFlag) {
                 m.checkCollisions(population) //should be called only after vehicle.tick
-                
-                if(start_prediction){
+
+                if (start_prediction) {
                     for (var i = 0; i < population.length; i++) {
-                        generation[population[i]].makeMove()
+                        CarsBatcher.car_batch[population[i]].makeMove()
                     }
                 }
             }
@@ -442,8 +450,6 @@
         }
 
         function initiate() {
-            reInitCarsInGeneration()
-            resetCars()
             generate()
             startPhysics()
             startAnimation()
@@ -502,19 +508,80 @@
         }
 
         function highlightVehicle(no) {
-            generation[no].mesh.material.color.setHex(CAR_HIGHLIGHT_COLOR)
-            generation[no].mesh.material.opacity = CAR_HIGHLIGHT_OPACITY
+            CarsBatcher.car_batch[no].mesh.material.color.setHex(CAR_HIGHLIGHT_COLOR)
+            CarsBatcher.car_batch[no].mesh.material.opacity = CAR_HIGHLIGHT_OPACITY
         }
 
         function removeHighlightFromVehicle(no) {
-            if(no >= MAX_POPULATION || no < 0) return
+            if (no >= CarsBatcher.batchSize || no < 0) return
 
-            generation[no].mesh.material.color.setHex(CAR_COLOR)
-            generation[no].mesh.material.opacity = CAR_OPACITY
+            CarsBatcher.car_batch[no].mesh.material.color.setHex(CAR_COLOR)
+            CarsBatcher.car_batch[no].mesh.material.opacity = CAR_OPACITY
         }
-    
-    
-        handler({keyCode: 38})
+
+
+        var highlighted_car = -1
+
+        function handler(event) {
+            if (event.keyCode != 38 && event.keyCode != 40) return
+
+            removeHighlightFromVehicle(highlighted_car)
+
+            // up
+            if (event.keyCode == 38) {
+                highlighted_car = (highlighted_car + 1) % CarsBatcher.batchSize
+            }
+
+            //down
+            if (event.keyCode == 40) {
+                highlighted_car = highlighted_car - 1
+                if (highlighted_car == -1) {
+                    highlighted_car = CarsBatcher.batchSize - 1
+                }
+            }
+
+            highlightVehicle(highlighted_car)
+            car_id_dom.value = highlighted_car
+
+            //bas commented code hai
+            {
+                // var up = (event.type == 'keyup');
+
+                // if (!up && event.type !== 'keydown') {
+                // return;
+                // }
+
+                // generation[population[current]].brake(0)
+
+                // switch (event.keyCode) {
+
+                // case 38: // forward
+                // generation[population[current]].forward(up)
+                // break;
+
+                // case 40: // backward
+                // generation[population[current]].reverse(up)
+                // break;
+
+                // case 66: // b
+                // generation[population[current]].brake(MAX_FORCE)
+                // break;
+
+                // case 39: // right
+                // generation[population[current]].turnRight(up)
+                // break;
+
+                // case 37: // left
+                // generation[population[current]].turnLeft(up)
+                // break;
+
+                // }
+            }
+        }
+
+        handler({
+            keyCode: 38
+        })
     </script>
 </body>
 

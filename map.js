@@ -188,8 +188,8 @@ function Map(start_pt, deg, width) {
     //collision helpers
     this.checkCollisions = function(vehicles){
         for(var vehicleNo of vehicles){
-            if(this.checkCollisionForVehicle(generation[vehicleNo])){
-                generation[vehicleNo].dead()
+            if(this.checkCollisionForVehicle(CarsBatcher.car_batch[vehicleNo])){
+                CarsBatcher.car_batch[vehicleNo].dead()
             }
         }
     }
