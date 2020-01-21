@@ -9,7 +9,7 @@ groundBody.addShape(new CANNON.Plane())
 groundBody.name = "GROUND"
 global.CANNON.world.addBody(groundBody)
 
-var groundMesh = new THREE.Mesh(new THREE.PlaneBufferGeometry(50, 50), new THREE.MeshPhongMaterial({
+var groundMesh = new THREE.Mesh(new THREE.PlaneBufferGeometry(100, 100), new THREE.MeshPhongMaterial({
     color: 0x444444
 }))
 global.THREE.scene.add(groundMesh)

@@ -2,17 +2,6 @@
 //      getFitness of the car is directly bound with "m"
 //      dead() is bound to population, generation and dead lists
 
-var min_x = -1.6631166840592289
-var max_x = 0
-var min_y = -0.09261972741090421
-var max_y = 0.06350142236672998
-var min_z = -2.047034908834945
-var max_z = 1.6576079261495047
-
-var x_len = max_x - min_x
-var y_len = max_y - min_y
-var z_len = max_z - min_z
-
 
 var CAR_SENSOR_TRANSFORMATION_MATRIX = new THREE.Matrix4()
 
@@ -50,6 +39,9 @@ var CAR_HIGHLIGHT_OPACITY = 1
 
 
 function CarWithSensors() {
+    this.disabled = false
+
+
     this.sensors = []
     this.lastCheckpointIndex = -1
 
@@ -182,6 +174,19 @@ function CarWithSensors() {
     this.turnLeft = function (end){
         this._vehicle.setSteeringValue(end ? 0 : MAX_STEER_VAL, 0);
         this._vehicle.setSteeringValue(end ? 0 : MAX_STEER_VAL, 1);
+    }
+
+    this.disable = function(){
+        this.disabled = true
+
+        global.CANNON.world.removeBody(this.body)
+        this._vehicle.removeFromWorld(global.CANNON.world)
+    }
+    this.enable = function(){
+        this.disabled = false
+
+        global.CANNON.world.addBody(this.body)
+        this._vehicle.addToWorld(global.CANNON.world)
     }
 
     this.dead = function () {
@@ -339,27 +344,6 @@ function CarWithSensors() {
                 body: wheelBody
             })
         }
-    }
-}
-
-function setminMax(vec){
-    if(vec.x < min_x){
-        min_x = vec.x
-    }
-    if (vec.x > max_x) {
-        max_x = vec.x
-    }
-    if (vec.y < min_y) {
-        min_y = vec.y
-    }
-    if (vec.y > max_y) {
-        max_y = vec.y
-    }
-    if (vec.z < min_z) {
-        min_z = vec.z
-    }
-    if (vec.z > max_z) {
-        max_z = vec.z
     }
 }
 

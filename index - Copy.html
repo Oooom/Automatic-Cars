@@ -54,7 +54,7 @@
             right: 0;
             top: 0;
             color: white;
-            font-size: 2em;
+            font-size: 1.5em;
             padding: 4px;
             font-family: Arial, Helvetica, sans-serif;
         }
@@ -66,7 +66,9 @@
 
     <div id="stats_overlay">
         Gen: <span id = "current_gen">1</span><br>
-        Batch: <span id="current_batch">1</span>/<span id="total_batch">1</span>
+        Batch: <span id="current_batch">1</span>/<span id="total_batch">1</span><br>
+        Max Population: <span id="max_pop">0</span><br>
+        This Batch: <span id="this_batch">0</span>
     </div>
 
     <div id="action_buttons">
@@ -74,6 +76,7 @@
             <button id="generate_btn">generate</button>
             <button id="stop_btn">stop</button>
             <button id="start_prediction_btn">start prediction</button>
+            <button id="next_batch_btn">next batch</button>
         </div>
 
         <div>
@@ -156,9 +159,7 @@
             stop_btn.disabled = false
             generate_btn.disabled = true
 
-            car_id_dom.value = 0
-            removeHighlightFromVehicle(highlighted_car)
-            highlighted_car = 0
+            resetCarIDInput()
 
             generate()
             startPhysics()
@@ -167,6 +168,15 @@
 
         start_prediction_btn.addEventListener("click", function () {
             start_prediction = true
+        })
+
+        next_batch_btn.addEventListener("click", function () {
+            start_prediction = false
+            CarsBatcher.nextBatch()
+            resetCarIDInput()
+            startPhysics()
+
+            highlightVehicle(highlighted_car)
         })
     </script>
 
@@ -327,7 +337,7 @@
         var GROUP3 = 4;
 
         var spawnPoint = {
-            x: 0,
+            x: -5,
             y: 4,
             z: 0
         }
@@ -361,42 +371,21 @@
 
         var m = new Map(spawnPoint, 0, 8)
 
-        m.addCheckpointAtCursor()
-        m.extendRouteTurnRight("E")
-        // m.addCheckpointAtCursor()
-        m.extendRouteStraight(6, "S")
-        // m.addCheckpointAtCursor()
-        m.extendRouteStraight(5, "S")
-        // m.addCheckpointAtCursor()
-        m.extendRouteTurnLeft("S")
-        // m.addCheckpointAtCursor()
+        m.addCheckpointAtCursor()        
+        m.extendRouteStraight(16, "E")
         m.extendRouteTurnLeft("E")
-        // m.addCheckpointAtCursor()
-        m.extendRouteStraight(19, "N")
-        // m.addCheckpointAtCursor()
-        // m.extendRouteStraight(5.6, "N")
-        // m.addCheckpointAtCursor()
-        // m.extendRouteStraight(5.8, "N")
-        // m.addCheckpointAtCursor()
+        m.extendRouteStraight(6, "N")
         m.extendRouteTurnLeft("N")
-        // m.addCheckpointAtCursor()
-        m.extendRouteStraight(8, "W")
-        // m.addCheckpointAtCursor()
-        m.extendRouteStraight(8, "W")
-        // m.addCheckpointAtCursor()
+        m.extendRouteStraight(25, "W")
         m.extendRouteTurnLeft("W")
-        // m.addCheckpointAtCursor()
-        m.extendRouteStraight(8, "S")
-        // m.addCheckpointAtCursor()
+        m.extendRouteStraight(15, "S")
         m.extendRouteTurnLeft("S")
-        // m.addCheckpointAtCursor()
+        m.extendRouteStraight(24, "E")
         m.extendRouteTurnRight("E")
-        // m.addCheckpointAtCursor()
-        m.extendRouteStraight(5, "S")
-        // m.addCheckpointAtCursor()
         m.extendRouteStraight(6, "S")
+        m.extendRouteTurnRight("S")
+        m.extendRouteStraight(10, "W")
         m.addCheckpointAtCursor()
-
 
         var animFlag = true
         var physicsFlag = false
@@ -520,6 +509,12 @@
         }
 
 
+        function resetCarIDInput(){
+            car_id_dom.value = 0
+            removeHighlightFromVehicle(highlighted_car)
+            highlighted_car = 0
+        }
+
         var highlighted_car = -1
 
         function handler(event) {
@@ -529,14 +524,14 @@
 
             // up
             if (event.keyCode == 38) {
-                highlighted_car = (highlighted_car + 1) % CarsBatcher.batchSize
+                highlighted_car = (highlighted_car + 1) % CarsBatcher.currentBatchLength
             }
 
             //down
             if (event.keyCode == 40) {
                 highlighted_car = highlighted_car - 1
                 if (highlighted_car == -1) {
-                    highlighted_car = CarsBatcher.batchSize - 1
+                    highlighted_car = CarsBatcher.currentBatchLength - 1
                 }
             }
 

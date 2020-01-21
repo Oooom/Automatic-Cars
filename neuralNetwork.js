@@ -18,7 +18,7 @@
 var DEFAULT_ARCHITECTURE = {
     inputs: 7,
     outputs: 5,
-    hiddenLayers: [7]
+    hiddenLayers: [6]
 }
 
 

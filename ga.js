@@ -3,18 +3,12 @@ var _population = []    //stores 0-batchSize numbers so as to copy it to populat
 var mating_pool = []    //only contains the brains
 var generation = []
 
-var car_batch = []
-
-var batchSize = 20
-var current_batch = 0
-
-
-
 var THIS_GENERATION = 0
 
-var MAX_POPULATION = 20
+var MAX_POPULATION = 100
+max_pop.innerText = MAX_POPULATION
 
-var MUTATION_RATE = 0.1
+var MUTATION_RATE = 0.01
 
 //must be called when next generation is to be created
 function generate(){
@@ -49,19 +43,9 @@ function generate(){
     CarsBatcher.setBatch(0)
 }
 
-// all dead cars are made alive and position/quaternion are set
-function resetCars(){
-    for(var car of generation){
-        car.resetBody()
-
-        car.body.position.set(spawnPoint.x, spawnPoint.y, spawnPoint.z)
-        car.body.quaternion.set(spawnQuat.x, spawnQuat.y, spawnQuat.z, spawnQuat.w)
-    }
-}
-
 function mutationFunction(x) {
     if (getRandomArbitrary(0, 1) < MUTATION_RATE) {
-        let offset = getRandomArbitrary(-1, 1) * 0.5    //modified
+        let offset = RandomGaussian() * 0.5    //modified
         let newx = x + offset
         return newx;
     } else {
