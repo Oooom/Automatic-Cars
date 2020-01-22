@@ -16,7 +16,7 @@
 //  constructor3 (options, nn1, nn2)    //crossover
 
 var DEFAULT_ARCHITECTURE = {
-    inputs: 7,
+    inputs: 9,
     outputs: 5,
     hiddenLayers: [6]
 }

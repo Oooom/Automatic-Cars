@@ -40,7 +40,8 @@ var CAR_HIGHLIGHT_OPACITY = 1
 
 function CarWithSensors() {
     this.disabled = false
-
+    this.throttleInput = 0
+    this.steerInput = 0.5
 
     this.sensors = []
     this.lastCheckpointIndex = -1
@@ -245,6 +246,8 @@ function CarWithSensors() {
 
     this.makeMove = function(){
         var ips = [...this.sensors.map((sensor) => { return sensor.state / CAR_SENSOR_SIZE})]
+        ips.push(this.throttleInput)
+        ips.push(this.steerInput)
 
         var res = this.brain.predict(ips)
 
@@ -253,19 +256,24 @@ function CarWithSensors() {
 
         if(res[0] > res[1]){
             engine_force = -MAX_FORCE
+            this.throttleInput = 1
         }
         else{ 
             engine_force = 0
+            this.throttleInput = 0
         }
 
         var max_val = Math.max(res[2], res[3], res[4])
 
         if(max_val == res[2]){
             steer_val = -MAX_STEER_VAL
+            this.steerInput = 1
         }if(max_val == res[3]){
             steer_val = 0
+            this.steerInput = 0.5
         }if(max_val == res[4]){
             steer_val = MAX_STEER_VAL
+            this.steerInput = 0
         }
         
 
