@@ -39,6 +39,7 @@ function generate(){
     }
 
     mating_pool = []
+    refreshMatingPoolDOM()
 
     CarsBatcher.setBatch(0)
 }
@@ -86,3 +87,21 @@ function crossover(target, nn1, nn2) {
         target.cloneFrom(nn1)
     }
 }
+
+function refreshMatingPoolDOM(){    
+    var opstr = ""
+    for(var i = 0; i < mating_pool.length; i++){
+        opstr += (i + ": " + mating_pool[i] + "<br>")
+    }
+
+    mating_pool_content_container.innerHTML = opstr
+}
+
+function highlightMatingPoolDOM(color){
+    mating_pool_container.style.backgroundColor = color
+
+    setTimeout(function(){
+        mating_pool_container.style.backgroundColor = "transparent"
+    }, 250)
+}
+

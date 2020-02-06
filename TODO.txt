@@ -1,4 +1,2 @@
-whenever batchsize changes and on init, call reinitCarBatch
-
-refreshBatch
-    - 
+addDistanceSensor
+addBrakeSensor

@@ -14,47 +14,53 @@
 //  constructor1 (options)              //blank
 //  constructor2 (options, nn1)         //make a copy
 //  constructor3 (options, nn1, nn2)    //crossover
+//  constructor4 (modelWrapper)         //modelWrapper should have .isModelWrapper: true and .model... For serialization/de-serialization
 
 var DEFAULT_ARCHITECTURE = {
-    inputs: 9,
-    outputs: 5,
+    inputs: 10,
+    outputs: 6,
     hiddenLayers: [6]
 }
 
 
 function NeuralNetwork(options, nn1, nn2){
-    setupDefaults(options)
-
-    this.model = tf.sequential()
-
-    for(var i = 0; i < options.hiddenLayers.length; i++){
-        var config = {
-            units: options.hiddenLayers[i],
+    if(options.isModelWrapper){
+        this.model = options.model
+    }else{
+        setupDefaults(options)
+    
+        this.model = tf.sequential()
+    
+        for(var i = 0; i < options.hiddenLayers.length; i++){
+            var config = {
+                units: options.hiddenLayers[i],
+                activation: options.activation
+            }
+    
+            if(i == 0)
+                config.inputShape = [options.inputs]
+    
+            var layer = tf.layers.dense(config)
+            this.model.add(layer)
+        }
+    
+        var op_config = {
+            units: options.outputs,
             activation: options.activation
         }
-
-        if(i == 0)
-            config.inputShape = [options.inputs]
-
-        var layer = tf.layers.dense(config)
-        this.model.add(layer)
+    
+        if(options.hiddenLayers.length == 0)
+            op_config.inputShape = [options.inputs]
+    
+        var op = tf.layers.dense(op_config)
+        this.model.add(op)
+    
+        this.model.compile({
+            optimizer: options.optimizer,
+            loss: options.loss
+        })
     }
-
-    var op_config = {
-        units: options.outputs,
-        activation: options.activation
-    }
-
-    if(options.hiddenLayers.length == 0)
-        op_config.inputShape = [options.inputs]
-
-    var op = tf.layers.dense(op_config)
-    this.model.add(op)
-
-    this.model.compile({
-        optimizer: options.optimizer,
-        loss: options.loss
-    })
+    
 
     this.predict = function(ips){
 
@@ -100,7 +106,7 @@ function NeuralNetwork(options, nn1, nn2){
             opt.loss = "meanSquaredError"
     }
 
-    if (nn1 instanceof NeuralNetwork) {
+    if (!options.isModelWrapper && nn1 instanceof NeuralNetwork) {
         crossover(this, nn1, nn2)
     }
 
@@ -146,4 +152,13 @@ function NeuralNetwork(options, nn1, nn2){
 
         return flag
     }
+
+    //TODO 
+
+    // this.toString = async function(){
+    //     let result = await this.model.save(tf.io.withSaveHandler(async modelArtifacts => modelArtifacts))
+    //     result.weightData = abtos(result.weightData)
+
+    //     return JSON.stringify(result)
+    // }
 }

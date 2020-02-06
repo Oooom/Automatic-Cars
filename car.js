@@ -6,14 +6,12 @@
 var CAR_SENSOR_TRANSFORMATION_MATRIX = new THREE.Matrix4()
 
 var CAR_SENSOR_ROTATION_MATRICES = []
-
 var degrees = [180, 0, 90, -90, 0, 45, -45]
-
 for(var i = 0; i < degrees.length; i++){
     var m = new THREE.Matrix4()
     m.makeRotationFromEuler(new THREE.Euler(0, 0, to_radians(degrees[i])))
 
-    CAR_SENSOR_ROTATION_MATRICES.push( m )    
+    CAR_SENSOR_ROTATION_MATRICES.push( m )
 }
 
 var CAR_SENSOR_IDENTITY_MAT = new THREE.Matrix4()
@@ -37,11 +35,18 @@ var CAR_OPACITY = 0
 var CAR_HIGHLIGHT_COLOR = 0xFFC0CB
 var CAR_HIGHLIGHT_OPACITY = 1
 
+var THROTTLE_INDEX = 0
+var NO_THROTTLE_INDEX = 1
+var BRAKE_INDEX = 2
+var STEER_LEFT_INDEX = 3
+var NO_STEER_INDEX = 4
+var STEER_RIGHT_INDEX = 5
 
 function CarWithSensors() {
     this.disabled = false
     this.throttleInput = 0
     this.steerInput = 0.5
+    this.reverseInput = 0
 
     this.sensors = []
     this.lastCheckpointIndex = -1
@@ -248,32 +253,50 @@ function CarWithSensors() {
         var ips = [...this.sensors.map((sensor) => { return sensor.state / CAR_SENSOR_SIZE})]
         ips.push(this.throttleInput)
         ips.push(this.steerInput)
+        ips.push(this.reverseInput)
 
         var res = this.brain.predict(ips)
 
         var engine_force
         var steer_val
 
-        if(res[0] > res[1]){
+        this.throttleInput = 0
+        this.reverseInput = 0
+        
+        var max_val = Math.max(res[THROTTLE_INDEX], res[NO_THROTTLE_INDEX], res[BRAKE_INDEX])
+        if (max_val == res[THROTTLE_INDEX]){
+        
             engine_force = -MAX_FORCE
             this.throttleInput = 1
-        }
-        else{ 
+        
+        }else if(max_val == res[NO_THROTTLE_INDEX]){
+            
             engine_force = 0
             this.throttleInput = 0
+
+        }else if(max_val == res[BRAKE_INDEX]){ 
+
+            engine_force = MAX_FORCE/2
+            this.reverseInput = 1
+
         }
 
-        var max_val = Math.max(res[2], res[3], res[4])
-
-        if(max_val == res[2]){
+        var max_val = Math.max(res[STEER_LEFT_INDEX], res[STEER_LEFT_INDEX], res[NO_STEER_INDEX])
+        if(max_val == res[STEER_RIGHT_INDEX]){
+        
             steer_val = -MAX_STEER_VAL
             this.steerInput = 1
-        }if(max_val == res[3]){
+        
+        }if(max_val == res[STEER_LEFT_INDEX]){
+        
             steer_val = 0
             this.steerInput = 0.5
-        }if(max_val == res[4]){
+        
+        }if(max_val == res[NO_STEER_INDEX]){
+        
             steer_val = MAX_STEER_VAL
             this.steerInput = 0
+        
         }
         
 
