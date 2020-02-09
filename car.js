@@ -43,6 +43,8 @@ var NO_STEER_INDEX = 4
 var STEER_RIGHT_INDEX = 5
 
 function CarWithSensors() {
+    this.inWhichChunk = 0
+
     this.disabled = false
     this.throttleInput = 0
     this.steerInput = 0.5

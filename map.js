@@ -8,8 +8,18 @@ var CHECKPOINT_MATERIAL = new THREE.MeshBasicMaterial({
     side: THREE.DoubleSide
 })
 
+function highlightMesh(mesh){
+    var old_pos = mesh.position.y
+
+    mesh.position.y = 10
+
+    setTimeout(function(){
+        mesh.position.y = old_pos
+    }, 1000)
+}
+
 function Map(start_pt, deg, width) {
-    this.walls = []
+    this.walls = [[]] //making the 0th chunk here itself
     this.wallHeight = 2
 
     this.checkpoints = []
@@ -43,15 +53,14 @@ function Map(start_pt, deg, width) {
         tmpRay[i].p1.applyMatrix4(tmpRotMat)
         tmpRay[i].p2.applyMatrix4(tmpRotMat)
 
-        this.walls.push(new Wall(tmpRay[i].p1, tmpRay[i].p2, this.wallHeight))
+        this.walls[0].push(new Wall(tmpRay[i].p1, tmpRay[i].p2, this.wallHeight))
     }
 
     this.leftCursor = this.walls[1].p2.clone()
     this.rightCursor = this.walls[2].p2.clone()
 
-    //map creation helpers
-    this.extendRoute = function(x1, z1, x2, z2){
-        
+    //map creation helpers' helpers
+    this.extendRoute = function(x1, z1, x2, z2){                
         this.extendLeftCursor(x1, z1)
         this.extendRightCursor(x2, z2)
 
@@ -59,7 +68,7 @@ function Map(start_pt, deg, width) {
     }
 
     this.extendLeftCursor = function(x, z){
-        this.walls.push(
+        this.walls[this.walls.length - 1].push(
             new Wall(
                 new THREE.Vector3(this.leftCursor.x, 0, this.leftCursor.z),
                 new THREE.Vector3(this.leftCursor.x + x, 0, this.leftCursor.z + z),
@@ -74,7 +83,7 @@ function Map(start_pt, deg, width) {
     }
 
     this.extendRightCursor = function(x, z){
-        this.walls.push(
+        this.walls[this.walls.length - 1].push(
             new Wall(
                 new THREE.Vector3(this.rightCursor.x, 0, this.rightCursor.z),
                 new THREE.Vector3(this.rightCursor.x + x, 0, this.rightCursor.z + z),
@@ -88,8 +97,11 @@ function Map(start_pt, deg, width) {
         return this
     }
 
+    //these are the functions which should be called directly
     this.extendRouteTurnRight = function(currentDir){        
         
+        this.walls.push([])
+
         switch (currentDir){
             case "N":
                     this.extendRightCursor(0, -this.width)
@@ -122,6 +134,8 @@ function Map(start_pt, deg, width) {
 
     this.extendRouteTurnLeft = function (currentDir) {
 
+        this.walls.push([])
+
         switch (currentDir) {
             case "N":
                 this.extendLeftCursor(0, -this.width)
@@ -153,6 +167,9 @@ function Map(start_pt, deg, width) {
     }
 
     this.extendRouteStraight = function (units, current_dir){
+        
+        this.walls.push([])
+
         switch(current_dir){
             case "E":
                     this.extendRoute(units, 0, units, 0)
@@ -201,7 +218,7 @@ function Map(start_pt, deg, width) {
 
         for(var wall of this.walls){
 
-            //checking for collision with wall
+            //checking for vehicle body's collision with wall
             for(var i = 0; i < bps.length; i++){
                 var line = {
                     p1: bps[i],
@@ -235,23 +252,23 @@ function Map(start_pt, deg, width) {
         }
         
         //checking for collision with checkpoint
-        
-        if (vehicle.lastCheckpointIndex < m.checkpoints.length - 1){
-            var nextCheckpointForThisVehicle = m.checkpoints[vehicle.lastCheckpointIndex + 1]
+        {
+        // if (vehicle.lastCheckpointIndex < m.checkpoints.length - 1){
+        //     var nextCheckpointForThisVehicle = m.checkpoints[vehicle.lastCheckpointIndex + 1]
 
-            for (var i = 0; i < bps.length; i++) {
-                var line = {
-                    p1: bps[i],
-                    p2: bps[(i + 1) % bps.length]
-                }
+        //     for (var i = 0; i < bps.length; i++) {
+        //         var line = {
+        //             p1: bps[i],
+        //             p2: bps[(i + 1) % bps.length]
+        //         }
 
-                if ( isIntersect(line, nextCheckpointForThisVehicle) ){
-                    vehicle.lastCheckpointIndex++
-                    break
-                }
-            }
+        //         if ( isIntersect(line, nextCheckpointForThisVehicle) ){
+        //             vehicle.lastCheckpointIndex++
+        //             break
+        //         }
+        //     }
+        // }
         }
-        
 
         for (var i = 0; i < vehicle.sensors.length; i++) {
             if(sensorState[i] > 0){
