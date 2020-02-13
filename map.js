@@ -19,7 +19,7 @@ function highlightMesh(mesh){
 }
 
 function Map(start_pt, deg, width) {
-    this.walls = [[]] //making the 0th chunk here itself
+    this.walls = [{walls:[], bb:[]}] //making the 0th chunk here itself
     this.wallHeight = 2
 
     this.checkpoints = []
@@ -216,8 +216,11 @@ function Map(start_pt, deg, width) {
         var sensorState = [0, 0, 0, 0]
         var isDead = false
 
-        for(var wall of this.walls){
+        var curr_chunk = vehicle.inWhichChunk
+        var prev_chunk = vehicle.inWhichChunk - 1
+        var next_chunk = vehicle.inWhichChunk + 1
 
+        
             //checking for vehicle body's collision with wall
             for(var i = 0; i < bps.length; i++){
                 var line = {
@@ -248,8 +251,6 @@ function Map(start_pt, deg, width) {
                     sensorState[i] = distance
                 }
             }
-
-        }
         
         //checking for collision with checkpoint
         {
@@ -282,6 +283,10 @@ function Map(start_pt, deg, width) {
 
 
         return isDead
+    }
+
+    function isWithinBB(position, bb){
+        
     }
 }
 
