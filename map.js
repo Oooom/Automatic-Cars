@@ -33,6 +33,8 @@ function Map(start_pt, deg, width) {
     
     var tmpRay = []
 
+
+    //BB is Tp2, Tp1, Lp1, Bp2
     //left
     tmpRay.push({
         p1: new THREE.Vector3(start_pt.x - width / 2, 0, start_pt.z + width / 2),
@@ -53,11 +55,19 @@ function Map(start_pt, deg, width) {
         tmpRay[i].p1.applyMatrix4(tmpRotMat)
         tmpRay[i].p2.applyMatrix4(tmpRotMat)
 
-        this.walls[0].push(new Wall(tmpRay[i].p1, tmpRay[i].p2, this.wallHeight))
+        this.walls[0].walls.push(new Wall(tmpRay[i].p1, tmpRay[i].p2, this.wallHeight))
     }
 
-    this.leftCursor = this.walls[1].p2.clone()
-    this.rightCursor = this.walls[2].p2.clone()
+    this.walls[0].bb = [
+        this.walls[0].walls[2].p2,        
+        this.walls[0].walls[2].p1,
+        this.walls[0].walls[0].p1,
+        this.walls[0].walls[1].p2,
+    ]
+
+
+    this.leftCursor = this.walls[0].walls[1].p2.clone()
+    this.rightCursor = this.walls[0].walls[2].p2.clone()
 
     //map creation helpers' helpers
     this.extendRoute = function(x1, z1, x2, z2){                
@@ -68,7 +78,7 @@ function Map(start_pt, deg, width) {
     }
 
     this.extendLeftCursor = function(x, z){
-        this.walls[this.walls.length - 1].push(
+        this.walls[this.walls.length - 1].walls.push(
             new Wall(
                 new THREE.Vector3(this.leftCursor.x, 0, this.leftCursor.z),
                 new THREE.Vector3(this.leftCursor.x + x, 0, this.leftCursor.z + z),
@@ -83,7 +93,7 @@ function Map(start_pt, deg, width) {
     }
 
     this.extendRightCursor = function(x, z){
-        this.walls[this.walls.length - 1].push(
+        this.walls[this.walls.length - 1].walls.push(
             new Wall(
                 new THREE.Vector3(this.rightCursor.x, 0, this.rightCursor.z),
                 new THREE.Vector3(this.rightCursor.x + x, 0, this.rightCursor.z + z),
@@ -100,24 +110,35 @@ function Map(start_pt, deg, width) {
     //these are the functions which should be called directly
     this.extendRouteTurnRight = function(currentDir){        
         
-        this.walls.push([])
+        this.walls.push({walls: [], bb: []})
+
+        var just_created = this.walls[this.walls.length - 1]
+
+        var fourthVec = new THREE.Vector3(0, 0, 0)
 
         switch (currentDir){
             case "N":
                     this.extendRightCursor(0, -this.width)
                     this.extendRightCursor(this.width, 0)
 
+                    fourthVec.x = just_created.walls[1].p2.x
+                    fourthVec.z = just_created.walls[0].p1.z
                 break
 
             case "S":
                     this.extendRightCursor(0, this.width)
                     this.extendRightCursor(-this.width, 0)
 
+                    fourthVec.x = just_created.walls[1].p2.x
+                    fourthVec.z = just_created.walls[0].p1.z
                 break
 
             case "W":
                     this.extendRightCursor(-this.width, 0)
                     this.extendRightCursor(0, -this.width)
+
+                    fourthVec.x = just_created.walls[0].p1.x
+                    fourthVec.z = just_created.walls[1].p2.z
 
                 break
 
@@ -125,21 +146,37 @@ function Map(start_pt, deg, width) {
                     this.extendRightCursor(this.width, 0)
                     this.extendRightCursor(0, this.width)
 
+                    fourthVec.x = just_created.walls[0].p1.x
+                    fourthVec.z = just_created.walls[1].p2.z
+
                 break
 
             default:
                 throw new Error("Unknown Direction")
         }
+
+        just_created.bb = [
+            just_created.walls[0].p1,
+            just_created.walls[0].p2,
+            just_created.walls[1].p2,
+            fourthVec
+        ]    
     }
 
     this.extendRouteTurnLeft = function (currentDir) {
 
-        this.walls.push([])
+        this.walls.push({walls: [], bb: []})
+        var just_created = this.walls[this.walls.length - 1]
+
+        var fourthVec = new THREE.Vector3(0, 0, 0)
 
         switch (currentDir) {
             case "N":
                 this.extendLeftCursor(0, -this.width)
                 this.extendLeftCursor(-this.width, 0)
+
+                fourthVec.x = just_created.walls[1].p2.x
+                fourthVec.z = just_created.walls[0].p1.z
 
                 break
 
@@ -147,11 +184,17 @@ function Map(start_pt, deg, width) {
                 this.extendLeftCursor(0, this.width)
                 this.extendLeftCursor(this.width, 0)
 
+                fourthVec.x = just_created.walls[1].p2.x
+                fourthVec.z = just_created.walls[0].p1.z
+
                 break
 
             case "W":
                 this.extendLeftCursor(-this.width, 0)
                 this.extendLeftCursor(0, this.width)
+
+                fourthVec.x = just_created.walls[0].p1.x
+                fourthVec.z = just_created.walls[1].p2.z
 
                 break
 
@@ -159,16 +202,27 @@ function Map(start_pt, deg, width) {
                 this.extendLeftCursor(this.width, 0)
                 this.extendLeftCursor(0, -this.width)
 
+                fourthVec.x = just_created.walls[0].p1.x
+                fourthVec.z = just_created.walls[1].p2.z
+
                 break
 
             default:
                 throw new Error("Unknown Direction")
         }
+
+
+        just_created.bb = [
+            just_created.walls[0].p1,
+            just_created.walls[0].p2,
+            just_created.walls[1].p2,
+            fourthVec
+        ]                        
     }
 
     this.extendRouteStraight = function (units, current_dir){
         
-        this.walls.push([])
+        this.walls.push({walls: [], bb: []})
 
         switch(current_dir){
             case "E":
@@ -190,6 +244,16 @@ function Map(start_pt, deg, width) {
             default:
                 throw new Error("Unknown Direction")
         }
+
+        var just_created = this.walls[this.walls.length - 1]
+
+        //w1p1 w1p2 w2p2 w2p1
+        just_created.bb = [
+            just_created.walls[0].p1,
+            just_created.walls[0].p2,
+            just_created.walls[1].p2,
+            just_created.walls[1].p1
+        ]
     }
 
     //checkpoint creation
@@ -247,12 +311,13 @@ function Map(start_pt, deg, width) {
                     var x = poi.x - vehicle.sensors[i].p1.x                    
                     var z = poi.z - vehicle.sensors[i].p1.z
 
+                    //@TODO - remove sqrt and directly divide with max distance sq
                     var distance = Math.sqrt(x*x+z*z)
                     sensorState[i] = distance
                 }
             }
         
-        //checking for collision with checkpoint
+        //checking for collision with checkpoint... disabled for now
         {
         // if (vehicle.lastCheckpointIndex < m.checkpoints.length - 1){
         //     var nextCheckpointForThisVehicle = m.checkpoints[vehicle.lastCheckpointIndex + 1]
@@ -283,10 +348,6 @@ function Map(start_pt, deg, width) {
 
 
         return isDead
-    }
-
-    function isWithinBB(position, bb){
-        
     }
 }
 
